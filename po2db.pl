@@ -32,11 +32,14 @@ $table_suffix=~s/^-++//;
 my @po_files=sort @ARGV;
 #try to reduce the path length
 my ($path_f,$path_l,$path_pre)=(@po_files[0,$#po_files],'');
-while($path_f=~/($path_pre[^\/]*\/)/){
-    my $t=$1;
-    last unless($path_l=~/^$path_pre/);
-    $path_pre=$t;
+if(defined $path_f){
+    while($path_f=~/($path_pre[^\/]*\/)/){
+	my $t=$1;
+	last unless($path_l=~/^$path_pre/);
+	$path_pre=$t;
+    }
 }
+
 
 $table_suffix= $path_pre if $table_suffix eq 'default';
 $table_suffix=~s/\/$//;
