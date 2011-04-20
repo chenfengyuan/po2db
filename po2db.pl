@@ -1,6 +1,13 @@
 #!/usr/bin/perl
 
-BEGIN{use File::Basename;use lib dirname($0);}
+BEGIN{
+    use File::Basename;
+    if(-l $0){
+	use lib dirname($0) .'/'. dirname(readlink $0);
+    }else {
+	use lib dirname($0);
+    }
+}
 use strict;
 use warnings;
 use Encode;
