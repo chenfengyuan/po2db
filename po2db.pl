@@ -2,11 +2,11 @@
 
 BEGIN{
     use File::Basename;
-    if(-l $0){
-	use lib dirname($0) .'/'. dirname(readlink $0);
-    }else {
-	use lib dirname($0);
-    }
+    # if(-l $0){
+    # 	use lib dirname($0) .'/'. dirname(readlink $0);
+    # }else {
+    	use lib dirname($0);
+    # }
 }
 use strict;
 use warnings;
