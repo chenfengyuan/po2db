@@ -77,7 +77,6 @@ if(exists $tables{$t1}){
     else{
 	$i='0';
     }
-    print "$i ";
     $dbh->do("alter table '$t1' rename to '${t1}_$i'");
     $dbh->do("alter table '$t2' rename to '${t2}_$i'");
     $dbh->do("drop index if exists '$i1'");
