@@ -7,12 +7,17 @@
 (defpackage cfy.po2db
   ;; (:use :common-lisp :sqlite :cl-ppcre)
   (:use :common-lisp :cl-ppcre)
-  (:export :po-read :po-get-headinfo :po-parse :flatlist))
+  (:export :po-read :po-get-headinfo :po-parse :flatlist :po-clear))
 
 (in-package cfy.po2db)
 (defvar *db-default-filename* "/dev/shm/main.sqlite")
 (defvar *db* nil)
 (defvar *table-suffix* "default")
+
+;;file coding(utf-8)
+#+ccl
+(setf ccl:*default-external-format* :utf-8)
+
 
 ;; regular expressions
 (defvar quote-text "\"[^\"\\\\]*(?:(?:\\\\.)+[^\"\\\\]*)+\"")
@@ -48,6 +53,11 @@
   (apply #'concatenate 'string strings))
 
 (let ((po)(index)(total))
+  (defun po-clear()
+    (setf po nil
+	  index 0
+	  total 0))
+  
   (defun po-reset-index()
     (setf index 0))
   
