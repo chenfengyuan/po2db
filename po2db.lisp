@@ -53,9 +53,25 @@
 ;; 	      if (eql 0 (search "\"Plural-Forms:" i)) collect i into plural
 ;; 	      until (and last lang char plural) finally (return (list last lang char plural))))))
 
-(defun read-file-to-list(filepath)
+;; (defun read-file-to-list(filepath)
+;;   (with-open-file (in filepath)
+;;     (loop as i = (read-line in nil) while i collect i)))
+
+(defun read-file-to-vector(filepath)
+  (let ((content (make-array 0 :fill-pointer t :adjustable t)))
+    (with-open-file (in filepath)
+      (loop as i = (read-line in nil) while i do (vector-push-extend  i content)))
+    content))
+
+
+(defun read-file-to-list-and-count-msgid(filepath)
   (with-open-file (in filepath)
-    (loop as i = (read-line in nil) while i collect i)))
+    (apply #'values
+	   (loop as i = (read-line in nil)
+	      while i
+	      collect i into s
+	      count (search "msgid" i) into id
+	      finally (return (list s id))))))
 
 (defun concatenate-strings(&rest strings)
   (apply #'concatenate 'string strings))
@@ -75,12 +91,11 @@
   (defun po-reset-index()
     (setf index 0))
   
-  (defun po-get-from-list(list)
-    (setf po (coerce list 'vector)))
+  ;; (defun po-get-from-list(list)
+  ;;   (setf po (coerce list 'vector)))
 
   (defun po-get(filename)
-    (setf po (po-get-from-list
-	      (read-file-to-list filename)))
+    (setf po (read-file-to-vector filename))
     (setf index 0)
     (setf total (length po)))
 
@@ -177,6 +192,7 @@
 (defun po-read-whole-item-for-loop()
   (po-goto-previous-line)
   (po-read-whole-item))
+
 (defun  po-parse()
   (let* ((id)(str)(ctxt)(flag)(result)
 	(when-id (lambda (new-id)
@@ -232,7 +248,63 @@
     (do ()
 	((po-if-eof) (funcall determined-when (po-read-line))result)
       (funcall determined-when (po-read-line)))))
-  ;; (let ((flag))
+
+(defun  po-parse-new()
+  (let* ((id)(str)(ctxt)(flag)(result (make-array 0 :fill-pointer t :adjustable t))
+	(when-id (lambda (new-id)
+		   (if (eql nil id)
+		       (setf id new-id)
+		       (error (format nil "dumplicated id:~a~%" (po-index))))))
+	(when-str (lambda (new-str)
+		    (if (and (not (eql nil id)) (eql nil str))
+			(setf str new-str)
+			(error (format nil "error str:~a~%" (po-index))))))
+	(when-ctxt (lambda (new-ctxt)
+		     (if (eql nil ctxt)
+			 (setf ctxt new-ctxt)
+			 (error (format nil "dumplicated ctxt:~a~%" (po-index))))))
+	(when-flag (lambda (new-flag)
+		     (if (eql nil flag)
+			 (setf flag new-flag)
+			 (error (format nil "dumplicated flag:~a~%" (po-index))))))
+	(when-comment (lambda (string)
+			string
+			(cond ((and id str)
+			       (vector-push-extend (list id str ctxt flag) result)
+			       (setf id nil str nil ctxt nil flag nil))
+			      ((not (eql nil flag))
+			       (setf flag nil)))))
+	(when-blank-or-eof (lambda (string)
+			     string
+			     (mydebug t "blank:~a " (po-index))
+			     (cond ((and id str)
+				    (vector-push-extend (list id str ctxt flag) result)
+				    (setf id nil str nil ctxt nil flag nil)))))
+	(s0
+	 (lambda (s1 s2 fn &optional (ext-fun nil))
+	   (cond ((eql 0 (search s1 s2))
+		  (if (eql nil  ext-fun)
+		      (funcall fn s2)
+		      (funcall fn (funcall ext-fun)))
+		  t)
+		 (t nil))))
+	  (determined-when
+	   (lambda (string)
+	     (cond ((funcall s0 "msgid " string when-id #'po-read-whole-item-for-loop)(mydebug t "id:~a~%" (po-index)))
+		   ((funcall s0 "msgstr " string when-str #'po-read-whole-item-for-loop)(mydebug t "str:~a~%" (po-index)))
+		   ((funcall s0 "msgstr[0]" string when-str #'po-read-whole-item-for-loop)(mydebug t "str:~a~%" (po-index)))
+		   ((funcall s0 "msgctxt" string when-ctxt #'po-read-whole-item-for-loop)(mydebug t "ctxt:~a~%" (po-index)))
+		   ((funcall s0 "#," string when-flag)(mydebug t "#,:~a~%" (po-index)))
+		   ((eql nil string) (funcall s0 "" string when-blank-or-eof)(mydebug t "nil:~a~%" (po-index)))
+		   ((funcall s0 "#" string when-comment)(mydebug t "comment:~a~%" (po-index)))
+		   ((funcall s0 "" string when-blank-or-eof)(mydebug t "empty:~a~%" (po-index)))
+		   (t (error (format nil "unexpect:~a~%" string)))))))
+    (po-index-save)
+    (po-reset-index)
+    (do ()
+	((po-if-eof) (funcall determined-when (po-read-line))result)
+      (funcall determined-when (po-read-line)))))
+;; (let ((flag))
   ;;   (values
   ;;    (loop
   ;; 	for i = (po-read-line)
