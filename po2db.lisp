@@ -7,7 +7,7 @@
 (defpackage cfy.po2db
   ;; (:use :common-lisp :sqlite :cl-ppcre)
   (:use :common-lisp :cl-ppcre)
-  (:export :po-get :po-get-headinfo :po-parse :flatlist))
+  (:export :po-read :po-get-headinfo :po-parse :flatlist))
 
 (in-package cfy.po2db)
 (defvar *db-default-filename* "/dev/shm/main.sqlite")
@@ -28,35 +28,6 @@
     ((atom (car l)) (cons (car l) (flatlist (cdr l))))
     ((append (flatlist (car l)) (flatlist (cdr l))))))
 
-;; (defun get-headinfo-item(re string)
-;;   (cadr
-;;    (multiple-value-list
-;;     (cl-ppcre:scan-to-strings
-;;      re
-;;      string))))
-
-;; (defun get-headinfo(po)
-;;   (mapcar #'get-headinfo-item
-;; 	  ;; ("\"Last-Translator: YunQiang Su <wzssyqa@gmail.com>\\n\""
-;; 	  ;;  "\"Language-Team: Chinese (simplified) <i18n-zh@googlegroups.com>\\n\""
-;; 	  ;;  "\"Content-Type: text/plain; charset=UTF-8\\n\""
-;; 	  ;;  "\"Plural-Forms: nplurals=1; plural=0;\\n\"")
-;; 	  '("^\"Last-Translator: *([^<]+[^ <]) *<([^>]+)>"
-;; 	    "^\"Language-Team: *([^<]+[^ <]) *<([^>]+)>"
-;; 	    "^\"Content-Type: text/plain; charset=([^ ]+) *\\\\n\""
-;; 	    "^\"Plural-Forms: *(.+[^ ]) *\\\\n\"")
-;; 	  (flatlist
-;; 	   (loop for i in po
-;; 	      if (eql 0 (search "\"Last-Translator:" i ))collect i into last
-;; 	      if (eql 0 (search "\"Language-Team:" i ))collect i into lang
-;; 	      if (eql 0 (search "\"Content-Type: text\/plain; charset=" i)) collect i into char
-;; 	      if (eql 0 (search "\"Plural-Forms:" i)) collect i into plural
-;; 	      until (and last lang char plural) finally (return (list last lang char plural))))))
-
-;; (defun read-file-to-list(filepath)
-;;   (with-open-file (in filepath)
-;;     (loop as i = (read-line in nil) while i collect i)))
-
 (defun read-file-to-vector(filepath)
   (let ((content (make-array 0 :fill-pointer t :adjustable t)))
     (with-open-file (in filepath)
@@ -76,25 +47,11 @@
 (defun concatenate-strings(&rest strings)
   (apply #'concatenate 'string strings))
 
-;; (defun get-t1()
-;;   (concatenate-strings "t_" *table-suffix*))
-
-;; (defun get-t2()
-;;   (concatenate-strings "h_" *table-suffix*))
-
-;; (defun init-db(&key (db *db*) (filename *db-default-filename*) (t1 (get-t1))(t2 (get-t2)))
-;;   (setf db (sqlite:connect filename))
-;;   (sqlite:execute-non-query db (format nil "create table ~a (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,pof text)" t1))
-;;   (sqlite:execute-non-query db (format nil "create table ~a (pof text,lname text,lmail text,tname text,tmail text,charset text,pforms text)" t2)))
-
 (let ((po)(index)(total))
   (defun po-reset-index()
     (setf index 0))
   
-  ;; (defun po-get-from-list(list)
-  ;;   (setf po (coerce list 'vector)))
-
-  (defun po-get(filename)
+  (defun po-read(filename)
     (setf po (read-file-to-vector filename))
     (setf index 0)
     (setf total (length po)))
@@ -304,20 +261,3 @@
     (do ()
 	((po-if-eof) (funcall determined-when (po-read-line))result)
       (funcall determined-when (po-read-line)))))
-;; (let ((flag))
-  ;;   (values
-  ;;    (loop
-  ;; 	for i = (po-read-line)
-  ;; 	while i
-  ;; 	if (eql 0 (search "msgid" i))
-  ;; 	collect (po-read-whole-item-for-loop) into id
-  ;; 	else if (eql 0 (search "msgstr" i))
-  ;; 	collect (po-read-whole-item-for-loop) into str
-  ;; 	else if (eql 0 (search "msgctxt" i))
-  ;; 	collect (po-read-whole-item-for-loop) into ctxt
-  ;; 	else if (eql 0 (search "#," i))
-  ;; 	do (setf flag i)
-					;   (po-index-restore)))
-  ;; (defun parse-po(po)
-  ;;   (let ((results '())
-  ;; 	(msgstr)(msgid)(flags)(msgctxt))
