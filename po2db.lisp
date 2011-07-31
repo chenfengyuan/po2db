@@ -241,7 +241,7 @@
   (escape-and-setf table-name po-file-name)
   (loop 
      for i across po-parse-result
-     for id from 1
+     for id from 0
      for msgid = (car i)
      for msgstr = (cadr i)
      for msgctxt = (caddr i)
