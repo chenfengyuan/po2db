@@ -7,7 +7,7 @@
 (defpackage cfy.po2db
   ;; (:use :common-lisp :sqlite :cl-ppcre)
   (:use :common-lisp :cl-ppcre)
-  (:export :po-read :po-get-headinfo :po-parse :flatlist :po-clear))
+  (:export :po-read :po-get-headinfo :po-parse :flatlist :po-clear :main))
 
 (in-package cfy.po2db)
 (defvar *db-default-filename* "/dev/shm/main.sqlite")
@@ -276,3 +276,16 @@
 	 do (loop for i in (po-sql po-table-name po-file-name (po-parse))
 	       do (format out "~a~%" i)))
     (format out "commit;~%")))
+
+(defun main ()
+  (let* ((po-table "t_")
+	(headinfo-table "h_")
+	(table-suffix "default")
+	(output-file "/dev/shm/lisp2sqlite")
+	(po-files
+	 #+ccl (cddr ccl:*command-line-argument-list*)
+	 #+sbcl (cddr sb-ext:*posix-argv*)
+	 )
+	 (headinfo-table-name (concatenate-strings headinfo-table table-suffix))
+	 (po-table-name (concatenate-strings po-table table-suffix)))
+    (po2sql po-files output-file headinfo-table-name po-table-name)))
