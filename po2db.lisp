@@ -223,11 +223,11 @@
       (funcall determined-when (po-read-line)))))
 
 ;; $dbh->do("create table '$t2' (pof text,lname text,lmail text,tname text,tmail text,charset text,pforms text)");
-(defun headinfo-sql (table-name po-file-name headinfo )
-  (let* ((last-translator (car headinfo))
-	 (lang-team (cadr headinfo))
-	 (charset (aref (caddr headinfo )0))
-	 (plural-forms (aref (cadddr headinfo) 0))
+(defun headinfo-sql (table-name po-file-name headinfo)
+  (let* ((last-translator (if (car headinfo) (car headinfo) #("" "")))
+	 (lang-team (if (cadr headinfo) (cadr headinfo) #("" "")))
+	 (charset (if (listp headinfo) (aref (caddr headinfo )0) ""))
+	 (plural-forms (if (cadddr headinfo) (aref (cadddr headinfo) 0) ""))
 	 (last-translator-name (aref last-translator 0))
 	 (last-translator-email (aref last-translator 1))
 	 (lang-team-name (aref lang-team 0))
@@ -258,3 +258,21 @@
 		     ;; $dbh->do("insert into '$t1' values($id,'$msgid','$msgstr','$msgctxt',$fuzzy,'$flag','$pof');");
 		     "insert into '~a' values('~a','~a','~a','~a','~a','~a','~a');"
 		     table-name id msgid msgstr msgctxt fuzzy flag po-file-name)))
+
+(defun po2sql (po-files output-file headinfo-table-name po-table-name)
+  (with-open-file (out output-file :direction :output :if-exists :supersede :if-does-not-exist :create)
+    (format out "begin transaction;~%")
+    ;; $dbh->do("create table '$t1' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,pof text)");
+    ;; $dbh->do("create table '$t2' (pof text,lname text,lmail text,tname text,tmail text,charset text,pforms text)");
+    (format out "create table '~a' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,por text);~%" po-table-name)
+    (format out "create table '~a' (pof text,lname text,lmail text,tname text,tmail text,charset text,pforms text);~%" headinfo-table-name)
+    (if (listp po-files)
+	t
+	(setf po-files (list po-files)))
+    (loop for po in po-files
+	 for po-file-name = (namestring po)
+	 do (po-read po)
+	 do (format out "~a~%" (headinfo-sql headinfo-table-name po-file-name (po-get-headinfo)))
+	 do (loop for i in (po-sql po-table-name po-file-name (po-parse))
+	       do (format out "~a~%" i)))
+    (format out "commit;~%")))
