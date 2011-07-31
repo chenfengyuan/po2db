@@ -237,5 +237,24 @@
     (format nil "insert into '~a' values('~a','~a','~a','~a','~a','~a','~a');" table-name po-file-name last-translator-name last-translator-email lang-team-name lang-team-email charset plural-forms)))
 
 ;; $dbh->do("create table '$t1' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,pof text)");
-;; (defun po-sql (table-name po-file-name po-parse-result)
-  
+(defun po-sql (table-name po-file-name po-parse-result)
+  (escape-and-setf table-name po-file-name)
+  (loop 
+     for i across po-parse-result
+     for id from 1
+     for msgid = (car i)
+     for msgstr = (cadr i)
+     for msgctxt = (caddr i)
+     for fuzzy = (if (search "fuzzy" (cadddr i)) 1 0)
+     for flag = (if (cadddr i)
+		    (cl-ppcre:regex-replace-all " *"
+						(cl-ppcre:regex-replace "# *, *"
+									(cl-ppcre:regex-replace ", *fuzzy" (cadddr i) "")
+									"")
+						"")
+		    "")
+     do (escape-and-setf msgid msgstr msgctxt flag)
+     collect (format nil
+		     ;; $dbh->do("insert into '$t1' values($id,'$msgid','$msgstr','$msgctxt',$fuzzy,'$flag','$pof');");
+		     "insert into '~a' values('~a','~a','~a','~a','~a','~a','~a');"
+		     table-name id msgid msgstr msgctxt fuzzy flag po-file-name)))
