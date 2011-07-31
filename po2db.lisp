@@ -110,6 +110,9 @@
 (defun escape-args (&rest args)
   (loop for i in args collect (escape i)))
 
+(defmacro escape-and-setf (&rest args)
+  `(progn ,@(loop for i in args collect `(setf ,i (escape ,i)))))
+
 (defun get-quoted-text(string)
   (let* ((first (search "\"" string))
 	 (last (search "\"" string :from-end t)))
@@ -229,6 +232,10 @@
 	 (last-translator-email (aref last-translator 1))
 	 (lang-team-name (aref lang-team 0))
 	 (lang-team-email (aref lang-team 1)))
-    (escape-args table-name po-file-name lang-team-name lang-team-email last-translator-name last-translator-email charset plural-forms)))
+    (escape-and-setf table-name po-file-name lang-team-name lang-team-email last-translator-name last-translator-email charset plural-forms)
+    ;; $dbh->do("insert into '$t2' values('$pof','$trans','$trans_e','$team','$team_e','$charset','$pf')");
+    (format nil "insert into '~a' values('~a','~a','~a','~a','~a','~a','~a');" table-name po-file-name last-translator-name last-translator-email lang-team-name lang-team-email charset plural-forms)))
 
 ;; $dbh->do("create table '$t1' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,pof text)");
+;; (defun po-sql (table-name po-file-name po-parse-result)
+  
