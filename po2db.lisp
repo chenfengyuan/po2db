@@ -254,11 +254,12 @@
 						"")
 		    "")
      do (escape-and-setf msgid msgstr msgctxt flag)
-     if (not (string= msgid ""))
+     if (not (string= "" msgid))
      collect (format nil
 		     ;; $dbh->do("insert into '$t1' values($id,'$msgid','$msgstr','$msgctxt',$fuzzy,'$flag','$pof');");
 		     "insert into '~a' values('~a','~a','~a','~a','~a','~a','~a');"
-		     table-name id msgid msgstr msgctxt fuzzy flag po-file-name)))
+		     table-name id msgid msgstr msgctxt fuzzy flag po-file-name)
+     else do (decf id)))
 
 (defun po2sql (po-files output-file headinfo-table-name po-table-name)
   (with-open-file (out output-file :direction :output :if-exists :supersede :if-does-not-exist :create)
