@@ -104,8 +104,11 @@
     (coerce
      (loop for i in l
 	if (eql #\' i)
-	collect #\' and collect #\' and collect #\' 
+	collect #\' and collect #\'
 	else collect i) 'string)))
+
+(defun escape-args (&rest args)
+  (loop for i in args collect (escape i)))
 
 (defun get-quoted-text(string)
   (let* ((first (search "\"" string))
@@ -271,3 +274,17 @@
     (do ()
 	((po-if-eof) (funcall determined-when (po-read-line))result)
       (funcall determined-when (po-read-line)))))
+
+;; $dbh->do("create table '$t2' (pof text,lname text,lmail text,tname text,tmail text,charset text,pforms text)");
+(defun headinfo-sql (table-name po-file-name headinfo )
+  (let* ((last-translator (car headinfo))
+	 (lang-team (cadr headinfo))
+	 (charset (aref (caddr headinfo )0))
+	 (plural-forms (aref (cadddr headinfo) 0))
+	 (last-translator-name (aref last-translator 0))
+	 (last-translator-email (aref last-translator 1))
+	 (lang-team-name (aref lang-team 0))
+	 (lang-team-email (aref lang-team 1)))
+    (escape-args table-name po-file-name lang-team-name lang-team-email last-translator-name last-translator-email charset plural-forms)))
+
+;; $dbh->do("create table '$t1' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,pof text)");
