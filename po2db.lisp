@@ -254,6 +254,7 @@
 						"")
 		    "")
      do (escape-and-setf msgid msgstr msgctxt flag)
+     if (not (string= msgid ""))
      collect (format nil
 		     ;; $dbh->do("insert into '$t1' values($id,'$msgid','$msgstr','$msgctxt',$fuzzy,'$flag','$pof');");
 		     "insert into '~a' values('~a','~a','~a','~a','~a','~a','~a');"
@@ -264,7 +265,7 @@
     (format out "begin transaction;~%")
     ;; $dbh->do("create table '$t1' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,pof text)");
     ;; $dbh->do("create table '$t2' (pof text,lname text,lmail text,tname text,tmail text,charset text,pforms text)");
-    (format out "create table '~a' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,por text);~%" po-table-name)
+    (format out "create table '~a' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,pof text);~%" po-table-name)
     (format out "create table '~a' (pof text,lname text,lmail text,tname text,tmail text,charset text,pforms text);~%" headinfo-table-name)
     (if (listp po-files)
 	t
@@ -275,6 +276,12 @@
 	 do (format out "~a~%" (headinfo-sql headinfo-table-name po-file-name (po-get-headinfo)))
 	 do (loop for i in (po-sql po-table-name po-file-name (po-parse))
 	       do (format out "~a~%" i)))
+    (let ((index-of-headinfo (concatenate-strings "i_" headinfo-table-name))
+	  (index-of-po (concatenate-strings "i_" po-table-name)))
+      ;; $dbh->do("create index '$i1' on '$t1' (id,msgid,msgstr,msgctxt,fuzzy,flag,pof)");
+      ;; $dbh->do("create index '$i2' on '$t2' (pof,lname,lmail,tname,tmail,charset,pforms)");
+      (format out "create index '~a' on '~a' (id,msgid,msgstr,msgctxt,fuzzy,flag,pof);" index-of-po po-table-name)
+      (format out "create index '~a' on '~a' (pof,lname,lmail,tname,tmail,charset,pforms);" index-of-headinfo headinfo-table-name))
     (format out "commit;~%")))
 
 (defun main ()
