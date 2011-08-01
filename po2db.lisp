@@ -261,39 +261,117 @@
 		     table-name id msgid msgstr msgctxt fuzzy flag po-file-name)
      else do (decf id)))
 
-(defun po2sql (po-files output-file headinfo-table-name po-table-name)
+(defun probe-list (string-or-list)
+  (if (and string-or-list (not (listp string-or-list)))
+      (list string-or-list)
+      string-or-list))
+
+(defun po2sql (po-files output-file headinfo-table-name po-table-name &key pre-sql suf-sql db-filepath)
   (with-open-file (out output-file :direction :output :if-exists :supersede :if-does-not-exist :create)
     (format out "begin transaction;~%")
-    ;; $dbh->do("create table '$t1' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,pof text)");
+
+    ;; pre sql output
+    (if pre-sql
+	(loop for i in (probe-list pre-sql)
+	     do (format out "~a~%" i)))
+    
+    (if db-filepath 
+	(flet ((if-table-exists-rename (db-filepath table-name)
+		 (let ((number-of-tables))
+		   (if (= 1 (parse-integer (com-with-sqlite3
+					    db-filepath
+					    (format nil "select count(name) from sqlite_master where name == '~a';" table-name))))
+		       (progn
+			 (setf number-of-tables
+			       (parse-integer
+				(com-with-sqlite3
+				 db-filepath
+				 (format nil "select count(name) from sqlite_master where name like '~a%';" table-name))))
+			 ;; $dbh->do("alter table '${t1}_$j1' rename to '${t1}_$j2'");
+			 (format nil "alter table '~a' rename to '~:*~a_~a';" table-name (1- number-of-tables)))
+		       nil))))
+	       (loop for i in `(,po-table-name ,headinfo-table-name)
+		  for sql = (if-table-exists-rename db-filepath i)
+		  if sql 
+		  do (format out "~a~%" sql))))
+
+	  ;; $dbh->do("create table '$t1' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,pof text)");
     ;; $dbh->do("create table '$t2' (pof text,lname text,lmail text,tname text,tmail text,charset text,pforms text)");
     (format out "create table '~a' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,pof text);~%" po-table-name)
     (format out "create table '~a' (pof text,lname text,lmail text,tname text,tmail text,charset text,pforms text);~%" headinfo-table-name)
-    (if (listp po-files)
-	t
-	(setf po-files (list po-files)))
+    
+    ;; (if (listp po-files)
+    ;; 	t
+    ;; 	(setf po-files (list po-files)))
+    (setf po-files (probe-list po-files))
     (loop for po in po-files
 	 for po-file-name = (namestring po)
 	 do (po-read po)
 	 do (format out "~a~%" (headinfo-sql headinfo-table-name po-file-name (po-get-headinfo)))
 	 do (loop for i in (po-sql po-table-name po-file-name (po-parse))
 	       do (format out "~a~%" i)))
-    (let ((index-of-headinfo (concatenate-strings "i_" headinfo-table-name))
-	  (index-of-po (concatenate-strings "i_" po-table-name)))
-      ;; $dbh->do("create index '$i1' on '$t1' (id,msgid,msgstr,msgctxt,fuzzy,flag,pof)");
-      ;; $dbh->do("create index '$i2' on '$t2' (pof,lname,lmail,tname,tmail,charset,pforms)");
-      (format out "create index '~a' on '~a' (id,msgid,msgstr,msgctxt,fuzzy,flag,pof);" index-of-po po-table-name)
-      (format out "create index '~a' on '~a' (pof,lname,lmail,tname,tmail,charset,pforms);" index-of-headinfo headinfo-table-name))
+
+    ;; output index sql
+    (if db-filepath
+	(let ((index-of-headinfo (concatenate-strings "i_" headinfo-table-name))
+	      (index-of-po (concatenate-strings "i_" po-table-name))
+	      (number-of-headinfo
+	       (parse-integer
+		(com-with-sqlite3
+		 db-filepath
+		 (format nil "select count(name) from sqlite_master where name like '~a%';" headinfo-table-name))))
+	      (number-of-po
+	       (parse-integer
+		(com-with-sqlite3
+		 db-filepath
+		 (format nil "select count(name) from sqlite_master where name like '~a%';" po-table-name)))))
+	      ;; $dbh->do("create index '$i1' on '$t1' (id,msgid,msgstr,msgctxt,fuzzy,flag,pof)");
+	      ;; $dbh->do("create index '$i2' on '$t2' (pof,lname,lmail,tname,tmail,charset,pforms)");
+	      (format out "create index '~a_~a' on '~a' (id,msgid,msgstr,msgctxt,fuzzy,flag,pof);~%" index-of-po number-of-po po-table-name)
+	      (format out "create index '~a_~a' on '~a' (pof,lname,lmail,tname,tmail,charset,pforms);~%" index-of-headinfo number-of-headinfo headinfo-table-name))
+	(let ((index-of-headinfo (concatenate-strings "i_" headinfo-table-name))
+	      (index-of-po (concatenate-strings "i_" po-table-name)))
+	  (format out "create index '~a' on '~a' (id,msgid,msgstr,msgctxt,fuzzy,flag,pof);~%" index-of-po po-table-name)
+	  (format out "create index '~a' on '~a' (pof,lname,lmail,tname,tmail,charset,pforms);~%" index-of-headinfo  headinfo-table-name)))
+
+
+    ;; suffix sql output
+    (loop for i in (probe-list suf-sql)
+       do (format out "~a~%" i))
+
     (format out "commit;~%")))
+
+(defun com-with-sqlite3(db-filepath sql &key sqlite3-options)
+  (let (;; (in (make-string-input-stream input))
+	(output (make-string-output-stream )));; :element-type '(unsigned-byte 8)))
+    (if (and sqlite3-options (not (listp sqlite3-options)))
+	(setf sqlite3-options (list sqlite3-options)))
+    (if sqlite3-options
+	(ccl:run-program "sqlite3" (append sqlite3-options `( ,db-filepath ,sql)) :output output)
+	(ccl:run-program "sqlite3" `(,db-filepath ,sql) :output output))
+    (get-output-stream-string output)))
+    
+
+(defun max-string(s1 s2)
+	 (loop
+	    with b1 = (length s1)
+	    with b2 = (length s2)  
+	    for i from 0 upto b1
+	    if (or (>= i b2) (char/= (char s1 i)
+		       (char s2 i)))
+	    return (subseq s1 0 i)))
 
 (defun main ()
   (let* ((po-table "t_")
-	(headinfo-table "h_")
-	(table-suffix "default")
-	(output-file "/dev/shm/lisp2sqlite")
-	(po-files
-	 #+ccl (cddr ccl:*command-line-argument-list*)
-	 #+sbcl (cddr sb-ext:*posix-argv*)
-	 )
+	 (headinfo-table "h_")
+	 (table-suffix "default")
+	 (output-file "/dev/shm/lisp2sqlite")
+	 (po-files (loop for i in (directory "/dev/shm/pos/*.po") collect (namestring i)))
 	 (headinfo-table-name (concatenate-strings headinfo-table table-suffix))
-	 (po-table-name (concatenate-strings po-table table-suffix)))
-    (po2sql po-files output-file headinfo-table-name po-table-name)))
+	 (po-table-name (concatenate-strings po-table table-suffix))
+	 (db-filepath "/dev/shm/main"))
+    ;; (with-open-file (out output-file :direction :output :if-exists :supersede :if-does-not-exist :create)
+    ;;   (loop for i in sql
+    ;; 	   do (format out "~a~%" i)))
+    (po2sql po-files output-file headinfo-table-name po-table-name :db-filepath db-filepath)
+    (com-with-sqlite3 db-filepath (concatenate-strings ".read " output-file))))
