@@ -101,7 +101,7 @@ sub trans_array{
 
 my ($msg_id,$msg_str);
 
-for my $i (&trans_array("/dev/shm/po-test")){
+for my $i (&trans_array(shift)){
     next if($$i[0] =~ /^$/);
     $msg_id.=$$i[0];
     $msg_str.=$$i[1];
