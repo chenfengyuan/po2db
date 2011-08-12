@@ -3,7 +3,6 @@
 use strict;
 use warnings;
 use Encode;
-use YAML;
 use Carp;
 
 my $quote_text=qr/[^"\\]*+(?:(?:\\.)++[^"\\]*+)*+/;
