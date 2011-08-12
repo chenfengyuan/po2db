@@ -111,8 +111,8 @@ $msg_id=~s/\n+/\n/g;
 $msg_str=~s/\n+/\n/g;
 $msg_id=~s/\n+\z//g;
 $msg_str=~s/\n+\z//g;
-$msg_id=~s/\n//g;
-$msg_str=~s/\n//g;
+$msg_id=~s/\n//;
+$msg_str=~s/\n//;
 
 $msg_id=encode "utf-8",$msg_id;
 $msg_str=encode "utf-8",$msg_str;
