@@ -114,8 +114,8 @@ for my $i (&trans_array(shift)){
 	$msg_str.=" .\n ".$$i[1];
     }
     else{
-	$msg_id.=$$i[0];
-	$msg_str.=$$i[1];
+	$msg_id.="\n ".$$i[0];
+	$msg_str.="\n ".$$i[1];
     }
     $j++;
 
