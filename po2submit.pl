@@ -102,13 +102,17 @@ my ($msg_id,$msg_str);
 
 for my $i (&trans_array(shift)){
     next if($$i[0] =~ /^$/);
-    $msg_id.=$$i[0];
-    $msg_str.=$$i[1];
+    $msg_id.="\n".$$i[0];
+    $msg_str.="\n".$$i[1];
 }
 $msg_id=~s/\\n/\n/g;
 $msg_str=~s/\\n/\n/g;
+$msg_id=~s/\n+/\n/g;
+$msg_str=~s/\n+/\n/g;
 $msg_id=~s/\n+\z//g;
 $msg_str=~s/\n+\z//g;
+$msg_id=~s/\n//g;
+$msg_str=~s/\n//g;
 
 $msg_id=encode "utf-8",$msg_id;
 $msg_str=encode "utf-8",$msg_str;
