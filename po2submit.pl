@@ -102,10 +102,23 @@ sub trans_array{
 
 my ($msg_id,$msg_str);
 
+my $j=0;
+
 for my $i (&trans_array(shift)){
     next if($$i[0] =~ /^$/);
-    $msg_id.="\n".$$i[0];
-    $msg_str.="\n".$$i[1];
+    $$i[0]=~s/^ +//;
+    $$i[1]=~s/^ +//;
+
+    if($j>1){
+	$msg_id.=" .\n ".$$i[0];
+	$msg_str.=" .\n ".$$i[1];
+    }
+    else{
+	$msg_id.=$$i[0];
+	$msg_str.=$$i[1];
+    }
+    $j++;
+
 }
 $msg_id=~s/\\n/\n/g;
 $msg_str=~s/\\n/\n/g;
