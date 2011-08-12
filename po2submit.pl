@@ -16,6 +16,8 @@ sub read_tailing{
 	    last;
 	}
     }
+    $_='' unless defined $_;
+    
     if (length $_ == 0 && eof) {
 	$_='EOF';
     }
