@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Encode;
 use Carp;
-use YAML;
+
 my $quote_text=qr/[^"\\]*+(?:(?:\\.)++[^"\\]*+)*+/;
 sub read_tailing{
     my $fh=shift;
@@ -101,7 +101,6 @@ sub trans_array{
 my ($msg_id,$msg_str);
 
 for my $i (&trans_array(shift)){
-    print Dump \$i;
     next if($$i[0] =~ /^$/);
     $msg_id.=$$i[0];
     $msg_str.=$$i[1];
