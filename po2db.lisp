@@ -260,7 +260,7 @@
      for msgctxt = (caddr i)
      for fuzzy = (if (search "fuzzy" (cadddr i)) 1 0)
      for flag = (if (cadddr i)
-		    (cl-ppcre:regex-replace-all " *"
+		    (cl-ppcre:regex-replace-all "#? *"
 						(cl-ppcre:regex-replace "# *, *"
 									(cl-ppcre:regex-replace ", *fuzzy" (cadddr i) "")
 									"")
