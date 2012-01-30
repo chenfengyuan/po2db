@@ -13,11 +13,7 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program; if not, write to the Free Software
 ;; Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-(defvar *need-load* t)
-(cond (*need-load*
-       ;; (asdf:oos 'asdf:load-op :sqlite))
-       (ql:quickload "cl-ppcre")))
-(setf *need-load* nil)
+
 
 (defpackage :cfy.po2db
   ;; (:use :common-lisp :sqlite :cl-ppcre)
