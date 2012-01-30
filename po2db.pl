@@ -116,6 +116,7 @@ for my $fn (@po_files){
 	}
 	else {
 	    $fuzzy=0;
+	    $flag=~s/ +//g;
 	}
 	++$id;
 	$dbh->do("insert into '$t1' values($id,'$msgid','$msgstr','$msgctxt',$fuzzy,'$flag','$pof');");
