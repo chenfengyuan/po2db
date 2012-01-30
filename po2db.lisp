@@ -1,18 +1,35 @@
+;; Copyright (C) 2011,2012 Chen Fengyuan (jeova.sanctus.unus+po2db (at) gmail.com)
+
+;; This program is free software; you can redistribute it and/or
+;; modify it under the terms of the GNU General Public License
+;; as published by the Free Software Foundation; either version 2
+;; of the License, or (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program; if not, write to the Free Software
+;; Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 (defvar *need-load* t)
 (cond (*need-load*
        ;; (asdf:oos 'asdf:load-op :sqlite))
-       (asdf:oos 'asdf:load-op :cl-ppcre)))
+       (ql:quickload "cl-ppcre")))
 (setf *need-load* nil)
 
-(defpackage cfy.po2db
+(defpackage :cfy.po2db
   ;; (:use :common-lisp :sqlite :cl-ppcre)
   (:use :common-lisp :cl-ppcre)
   (:export :po-read :po-get-headinfo :po-parse :flatlist :po-clear :main))
 
-(in-package cfy.po2db)
-(defvar *db-default-filename* "/dev/shm/main.sqlite")
-(defvar *db* nil)
-(defvar *table-suffix* "default")
+(in-package :cfy.po2db)
+(defvar *default-db-file-path* "main.sqlite")
+(defvar *default-sql* "sql")
+(defvar *default-table-suffix* "default")
+(defvar *default-table-prefix* "t_")
+(defvar *default-headinfo-prefix* "h_")
 
 ;;file coding(utf-8)
 #+ccl
@@ -226,7 +243,7 @@
 (defun headinfo-sql (table-name po-file-name headinfo)
   (let* ((last-translator (if (car headinfo) (car headinfo) #("" "")))
 	 (lang-team (if (cadr headinfo) (cadr headinfo) #("" "")))
-	 (charset (if (listp headinfo) (aref (caddr headinfo )0) ""))
+	 (charset (if (caddr headinfo) (aref (caddr headinfo )0) ""))
 	 (plural-forms (if (cadddr headinfo) (aref (cadddr headinfo) 0) ""))
 	 (last-translator-name (aref last-translator 0))
 	 (last-translator-email (aref last-translator 1))
@@ -265,6 +282,23 @@
   (if (and string-or-list (not (listp string-or-list)))
       (list string-or-list)
       string-or-list))
+(defun com-with-sqlite3(db-filepath sql &key sqlite3-options)
+  (let (;; (in (make-string-input-stream input))
+	(output (make-string-output-stream )));; :element-type '(unsigned-byte 8)))
+    (if (and sqlite3-options (not (listp sqlite3-options)))
+	(setf sqlite3-options (list sqlite3-options)))
+    (if sqlite3-options
+	(progn
+	  #+sbcl
+	  (sb-ext:run-program "sqlite3" (list sqlite3-options db-filepath sql) :output  output :search t)
+	  #+ccl
+	  (ccl:run-program "sqlite3" (append sqlite3-options `( ,db-filepath ,sql)) :output output))
+	(progn
+	  #+sbcl
+	  (sb-ext:run-program "sqlite3" (list db-filepath sql) :output output :search t)
+	  #+ccl
+	  (ccl:run-program "sqlite3" `(,db-filepath ,sql) :output output)))
+    (get-output-stream-string output)))
 
 (defun po2sql (po-files output-file headinfo-table-name po-table-name &key pre-sql suf-sql db-filepath)
   (with-open-file (out output-file :direction :output :if-exists :supersede :if-does-not-exist :create)
@@ -341,17 +375,6 @@
 
     (format out "commit;~%")))
 
-(defun com-with-sqlite3(db-filepath sql &key sqlite3-options)
-  (let (;; (in (make-string-input-stream input))
-	(output (make-string-output-stream )));; :element-type '(unsigned-byte 8)))
-    (if (and sqlite3-options (not (listp sqlite3-options)))
-	(setf sqlite3-options (list sqlite3-options)))
-    (if sqlite3-options
-	(ccl:run-program "sqlite3" (append sqlite3-options `( ,db-filepath ,sql)) :output output)
-	(ccl:run-program "sqlite3" `(,db-filepath ,sql) :output output))
-    (get-output-stream-string output)))
-    
-
 (defun max-string(s1 s2)
 	 (loop
 	    with b1 = (length s1)
@@ -361,7 +384,7 @@
 		       (char s2 i)))
 	    return (subseq s1 0 i)))
 
-(defun main ()
+(defun test ()
   (let* ((po-table "t_")
 	 (headinfo-table "h_")
 	 (table-suffix "default")
@@ -375,3 +398,47 @@
     ;; 	   do (format out "~a~%" i)))
     (po2sql po-files output-file headinfo-table-name po-table-name :db-filepath db-filepath)
     (com-with-sqlite3 db-filepath (concatenate-strings ".read " output-file))))
+
+;;; argument parser
+#+sbcl
+(defun argv (&optional argv-test)
+  (let ((argv (or argv-test (cdr sb-ext:*posix-argv*)))
+	po-files)
+    (multiple-value-bind (db-file-path table-suffix output-file)
+	(values-list
+	 (loop for i in argv
+	    if (all-matches "\\.po$" i)
+	    do (push i po-files)
+	    else
+	    collect i into opt
+	    finally (return opt)))
+      (list (or db-file-path *default-db-file-path*)
+	    (or table-suffix *default-table-suffix*)
+	    (or output-file *default-sql*)
+	    po-files))))
+(defun main ()
+  (destructuring-bind
+	(db-file-path table-suffix output-file po-files)
+      (argv)
+    (if (null po-files)
+	(format
+	 *standard-output*
+	 "Usage: ~a [db-file-path] [table-suffix] [sql-file] po-files~%~aReport po2db.lisp bugs to jeova.sanctus.unus~agmail.org~%"
+	#+sbcl
+	(car sb-ext:*posix-argv*)
+	#-sbcl
+	"lisp"
+	(with-output-to-string (out)
+	  (loop for (i j)in `(`,("db-file-path" ,*default-db-file-path*)
+				`,("table-suffix" ,*default-table-suffix*)
+				`,("sql-file" ,*default-sql*))
+	       do (format out "The default value of ~a is ~a~%" i j)))
+	"@")
+	(let ((headinfo-table-name (concatenate-strings *default-headinfo-prefix* table-suffix))
+	      (po-table-name (concatenate-strings *default-table-prefix* table-suffix)))
+	  (po2sql po-files output-file headinfo-table-name po-table-name :db-filepath db-file-path)
+	  (com-with-sqlite3 db-file-path (concatenate-strings ".read " output-file))))))
+;; compile as elf
+;; (declaim (optimize (speed 3)(debug 0)(space 3)))
+;; (load "/home/cfy/gits/po2db/po2db.lisp")
+;; (save-lisp-and-die "po2db" :toplevel #'cfy.po2db:main :executable t)
