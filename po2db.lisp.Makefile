@@ -1,11 +1,11 @@
 lisp = /usr/bin/sbcl
 
-.PHONY : clean
-po2db : ~/quicklisp/setup.lisp po2db.lisp
-	$(lisp) --no-userinit --load ~/quicklisp/setup.lisp --eval '(declaim (optimize (speed 3)(debug 0)(space 3)))' --eval '(load "/home/cfy/gits/po2db/po2db.lisp")' --eval "(save-lisp-and-die \"po2db\" :toplevel #'cfy.po2db:main :executable t)"
+.PHONY : clean quicklisp
+po2db : po2db.lisp
+	$(lisp) --eval "(require 'cl-ppcre)" --eval '(declaim (optimize (speed 3)(debug 0)(space 3)))' --eval '(load "/home/cfy/gits/po2db/po2db.lisp")' --eval "(save-lisp-and-die \"po2db\" :toplevel #'cfy.po2db:main :executable t)"
 
-~/quicklisp/setup.lisp : quicklisp.lisp
-	$(lisp) --load quicklisp.lisp --eval '(quicklisp-quickstart:install)' --eval '(quit)'
+quicklisp : quicklisp.lisp
+	$(lisp) --load quicklisp.lisp --eval '(quicklisp-quickstart:install)' --eval '(ql:quickload "cl-ppcre")' --eval '(ql:add-to-init-file)' --eval '(quit)'
 
 quicklisp.lisp :
 	wget 'http://beta.quicklisp.org/quicklisp.lisp'
