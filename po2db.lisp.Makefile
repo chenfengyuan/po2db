@@ -2,7 +2,7 @@ lisp = /usr/bin/sbcl
 
 .PHONY : clean quicklisp
 po2db : po2db.lisp
-	$(lisp) --eval "(require 'cl-ppcre)" --eval '(declaim (optimize (speed 3)(debug 0)(space 3)))' --eval '(load "po2db.lisp")' --eval "(save-lisp-and-die \"po2db\" :toplevel #'cfy.po2db:main :executable t)"
+	$(lisp) --eval "(require 'asdf)" --eval "(require 'cl-ppcre)" --eval '(declaim (optimize (speed 3)(debug 0)(space 3)))' --eval '(load "po2db.lisp")' --eval "(save-lisp-and-die \"po2db\" :toplevel #'cfy.po2db:main :executable t)"
 
 quicklisp : quicklisp.lisp
 	$(lisp) --load quicklisp.lisp --eval '(quicklisp-quickstart:install)' --eval '(ql:quickload "cl-ppcre")' --eval '(ql:add-to-init-file)' --eval '(quit)'
