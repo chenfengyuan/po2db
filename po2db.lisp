@@ -464,7 +464,10 @@
 		(delete-file fasl))
 	    (load first)
 	    (main2)
-	    (sb-ext:save-lisp-and-die "po2db" :toplevel #'cfy.po2db:main :executable t)
+	    (sb-ext:save-lisp-and-die
+	     #+sbcl
+	     (car sb-ext:*posix-argv*)
+	     :toplevel #'cfy.po2db:main :executable t)
 	    )
 	  (main2))))
   (hot-update))
