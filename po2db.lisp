@@ -448,7 +448,9 @@
 	(let ((headinfo-table-name (concatenate-strings *default-headinfo-prefix* table-suffix))
 	      (po-table-name (concatenate-strings *default-table-prefix* table-suffix)))
 	  (po2sql po-files output-file headinfo-table-name po-table-name :db-filepath db-file-path)
-	  (com-with-sqlite3 db-file-path (concatenate-strings ".read " output-file))))))
+	  (com-with-sqlite3 db-file-path (concatenate-strings ".read " output-file))
+	  (if (probe-file output-file)
+	      (delete-file output-file))))))
 (defun main ()
   (defun hot-update ()
     (let ((first (cadr
