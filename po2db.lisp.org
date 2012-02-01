@@ -1,0 +1,5 @@
+* usuage
+  - the argument db-file-path, table-suffix, and sql-file is optional
+  - po2db will display the usage only if po2db is started and there is no lisp file or po files pass to it.
+  - expect the lisp source file pass as the first argument,other arguments should not have a  .lisp as suffix,and the db-file-path,table-suffix,sql-file arguments should not have a .po as suffix
+  - the lisp source file should have a .lisp as suffix
