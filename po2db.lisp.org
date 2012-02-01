@@ -1,3 +1,8 @@
+* make
+#+begin_src shell
+$ make quicklisp 			# if you don't have quicklisp and cl-ppcre installed on you system
+$ make
+#+end_src
 * usuage
   - the argument db-file-path, table-suffix, and sql-file is optional
   - po2db will display the usage only if po2db is started and there is no lisp file or po files pass to it.
