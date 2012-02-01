@@ -430,7 +430,18 @@
   (destructuring-bind
 	(db-file-path table-suffix output-file po-files)
       (argv)
-    (if (null po-files)
+    (if (or (eq 1
+		#+sbcl
+		(length sb-ext:*posix-argv*))
+	    (not
+	     (or
+	      (let ((first
+		     #+sbcl
+		      (cadr
+		       sb-ext:*posix-argv*)))
+		(and first
+		     (scan "\\.lisp$" first)))
+	      po-files)))
 	(format
 	 *standard-output*
 	 "Usage: ~a~a [dot-lisp-file [db-file-path [table-suffix [sql-file]]]] po-files~%~aReport po2db.lisp bugs to jeova.sanctus.unus~agmail.org~%Git: https://github.com/chenfengyuan/po2db~%"
@@ -444,12 +455,16 @@
 				 `,("table-suffix" ,*default-table-suffix*)
 				 `,("sql-file" ,*default-sql*))
 	      do (format out "The default value of ~a is ~a~%" i j)))
-	 "@")
+	 "@"))
+    (if po-files
 	(let ((headinfo-table-name (concatenate-strings *default-headinfo-prefix* table-suffix))
 	      (po-table-name (concatenate-strings *default-table-prefix* table-suffix)))
 	  (po2sql po-files output-file headinfo-table-name po-table-name :db-filepath db-file-path)
 	  (com-with-sqlite3 db-file-path (concatenate-strings ".read " output-file))
-	  (if (probe-file output-file)
+	  (if (and
+	       #+sbcl
+	       (not (sb-ext:posix-getenv "DEBUG"))
+	       (probe-file output-file))
 	      (delete-file output-file))))))
 (defun main ()
   (defun hot-update ()
