@@ -1,3 +1,4 @@
 tarball/
 quicklisp.lisp
 po2db
+po2db.fasl
