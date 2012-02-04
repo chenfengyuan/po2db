@@ -26,8 +26,17 @@
 (defvar *default-table-suffix* "default")
 (defvar *default-table-prefix* "t_")
 (defvar *default-headinfo-prefix* "h_")
+
+
+;;; it seems the concatenate version is faster than with-output-to-string version
 (defun concatenate-strings(&rest strings)
   (apply #'concatenate 'string strings))
+
+(defun concatenate-strings2 (&rest strings)
+  (with-output-to-string (out)
+    (dolist (i strings)
+      (write i :stream out))))
+
 (defparameter *version* (let* ((arg (cadr #+sbcl sb-ext:*posix-argv*))
 			       (file (or (and
 					  arg
