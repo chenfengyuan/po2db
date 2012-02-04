@@ -105,97 +105,83 @@
 	      collect i into s
 	      count (search "msgid" i) into id
 	      finally (return (list s id))))))
-(defstruct po-file-parse
-  (po nil)
+(defstruct po2
+  (lines nil)
   (index 0)
   (total 0)
   pre-index)
 
-(defclass po ()
-  ((po-file-parse :accessor po-file-parse :initform (make-po-file-parse))))
+;; (defclass po ()
+;;   ((po-file-parse :accessor po-file-parse :initform (make-po-file-parse))))
 
-(defun po2-clear (po)
-  (let ((po-file-parse (po-file-parse po)))
-    (setf (po-file-parse-po po-file-parse) nil
-	  (po-file-parse-index po-file-parse) 0
-	  (po-file-parse-total po-file-parse) 0))
-  po)
+(defun po2-clear (po2)
+  (setf (po2-lines po2) nil
+	(po2-index po2) 0
+	(po2-total po2) 0)
+  po2)
 
-(defun po2-reset-index (po)
-  (setf (po-file-parse-index (po-file-parse po)) 0)
-  po)
+(defun po2-reset-index (po2)
+  (setf (po2-index po2) 0)
+  po2)
 
-(defun po2-read (po filepath)
-  (let ((po-file-parse (po-file-parse po)))
-    (setf (po-file-parse-po po-file-parse) (read-file-to-vector filepath)
-	  (po-file-parse-index po-file-parse) 0
-	  (po-file-parse-total po-file-parse) (length (po-file-parse-po po-file-parse))))
-  po)
+(defun po2-read (po2 filepath)
+  (setf (po2-lines po2) (read-file-to-vector filepath)
+	(po2-index po2) 0
+	(po2-total po2) (length (po2-lines po2)))
+  po2)
 
-(defun po2-read-line (po)
-  (let* ((po-file-parse (po-file-parse po))
-	 (index (po-file-parse-index po-file-parse))
-	 (total (po-file-parse-total po-file-parse))
-	 (po (po-file-parse-po po-file-parse)))
+(defun po2-read-line (po2)
+  (let ((index (po2-index po2))
+	(total (po2-total po2))
+	(lines (po2-lines po2)))
     (cond ((< index total)
-	   (aref po (1- (incf (po-file-parse-index po-file-parse)))))
+	   (aref lines (1- (incf (po2-index po2)))))
 	  (t nil))))
 
-(defun po2-goto-previous-line (po)
-  (let ((po-file-parse (po-file-parse po)))
-    (if (> (po-file-parse-index po-file-parse) 0)
-	(decf (po-file-parse-index po-file-parse))))
-  po)
+(defun po2-goto-previous-line (po2)
+  (if (> (po2-index po2) 0)
+      (decf (po2-index po2)))
+  po2)
 
-(defun po2-eof-p (po)
-  (let* ((po-file-parse (po-file-parse po))
-	 (index (po-file-parse-index po-file-parse))
-	 (total (po-file-parse-total po-file-parse)))
+(defun po2-eof-p (po2)
+  (let ((index (po2-index po2))
+	(total (po2-total po2)))
     (eq index total)))
 
-(defun po2-index (po)
-  (po-file-parse-index (po-file-parse po)))
-
-(defun po2-total (po)
-  (po-file-parse-total (po-file-parse po)))
-
-(defun po2-set-index (po i)
-  (let* ((po-file-parse (po-file-parse po))
-	 (total (po-file-parse-total po-file-parse))
-	 index)
+(defun po2-set-index (po2 i)
+  (let ((total (po2-total po2))
+	index)
     (cond ((>= i total)
 	   (setf index (1- total)))
 	  ((minusp i)
 	   (setf index 0))
 	  (t
 	   (setf index i)))
-    (setf (po-file-parse-index po-file-parse) index))
-  po)
+    (setf (po2-index po2) index))
+  po2)
 
-(defun po2-index-save (po)
-  (let ((po-file-parse (po-file-parse po)))
-    (setf (po-file-parse-pre-index po-file-parse)
-	  (po-file-parse-index po-file-parse)))
-  po)
+(defun po2-index-save (po2)
+  (setf (po2-pre-index po2)
+	(po2-index po2))
+  po2)
 
-(defun po2-index-restore (po)
-  (let ((po-file-parse (po-file-parse po)))
-    (and (po-file-parse-pre-index po-file-parse)
-	 (po2-set-index po (po-file-parse-pre-index po-file-parse))
-	 (setf (po-file-parse-pre-index po-file-parse) nil)))
-  po)
+(defun po2-index-restore (po2)
+  (and (po2-pre-index po2)
+       (po2-set-index po2 (po2-pre-index po2))
+       (setf (po2-pre-index po2) nil))
+  po2)
 
 
-(defun po2-read-whole-item (po)
-  (let ((first (get-quoted-text (po2-read-line po))))
+(defun po2-read-whole-item (po2)
+  (let ((first (get-quoted-text (po2-read-line po2))))
     (apply #'concatenate-strings
 	   first
-	   (loop for i = (po2-read-line po)
+	   (loop for i = (po2-read-line po2)
 	      while i
 	      if (eql 0 (search "\"" i))
 	      collect (get-quoted-text i) into s
 	      else
-	      do (po2-goto-previous-line po) and
+	      do (po2-goto-previous-line po2) and
 	      return s))))
 
 (defun get-headinfo-item (re string)
@@ -205,51 +191,51 @@
      re
      string))))
 
-(defun po2-get-headinfo(po)
-  (po2-index-save po)
-  (po2-reset-index po)
+(defun po2-get-headinfo(po2)
+  (po2-index-save po2)
+  (po2-reset-index po2)
   (values
    (mapcar  #'get-headinfo-item
-	   ;; ("\"Last-Translator: YunQiang Su <wzssyqa@gmail.com>\\n\""
-	   ;;  "\"Language-Team: Chinese (simplified) <i18n-zh@googlegroups.com>\\n\""
-	   ;;  "\"Content-Type: text/plain; charset=UTF-8\\n\""
-	   ;;  "\"Plural-Forms: nplurals=1; plural=0;\\n\"")
-	   '("^\"Last-Translator: *([^<]+[^ <]) *<([^>]+)>"
-	     "^\"Language-Team: *([^<]+[^ <]) *<([^>]+)>"
-	     "^\"Content-Type: text/plain; charset=([^ ]+) *\\\\n\""
-	     "^\"Plural-Forms: *(.+[^ ]) *\\\\n\"")
-	   (flatlist
-	    (loop for i = (po2-read-line po)
-	       while i
-	       if (eql 0 (search "\"Last-Translator:" i ))collect i into last
-	       if (eql 0 (search "\"Language-Team:" i ))collect i into lang
-	       if (eql 0 (search "\"Content-Type: text\/plain; charset=" i)) collect i into char
-	       if (eql 0 (search "\"Plural-Forms:" i)) collect i into plural
-	       until (and last lang char plural) finally (return (list last lang char plural)))))
-   (po2-index-restore po)))
+	    ;; ("\"Last-Translator: YunQiang Su <wzssyqa@gmail.com>\\n\""
+	    ;;  "\"Language-Team: Chinese (simplified) <i18n-zh@googlegroups.com>\\n\""
+	    ;;  "\"Content-Type: text/plain; charset=UTF-8\\n\""
+	    ;;  "\"Plural-Forms: nplurals=1; plural=0;\\n\"")
+	    '("^\"Last-Translator: *([^<]+[^ <]) *<([^>]+)>"
+	      "^\"Language-Team: *([^<]+[^ <]) *<([^>]+)>"
+	      "^\"Content-Type: text/plain; charset=([^ ]+) *\\\\n\""
+	      "^\"Plural-Forms: *(.+[^ ]) *\\\\n\"")
+	    (flatlist
+	     (loop for i = (po2-read-line po2)
+		while i
+		if (eql 0 (search "\"Last-Translator:" i ))collect i into last
+		if (eql 0 (search "\"Language-Team:" i ))collect i into lang
+		if (eql 0 (search "\"Content-Type: text\/plain; charset=" i)) collect i into char
+		if (eql 0 (search "\"Plural-Forms:" i)) collect i into plural
+		until (and last lang char plural) finally (return (list last lang char plural)))))
+   (po2-index-restore po2)))
 
-(defun po2-read-whole-item-for-loop(po)
-  (po2-goto-previous-line po)
-  (po2-read-whole-item po))
+(defun po2-read-whole-item-for-loop(po2)
+  (po2-goto-previous-line po2)
+  (po2-read-whole-item po2))
 
-(defun  po2-parse(po)
+(defun  po2-parse(po2)
   (let* ((id)(str)(ctxt)(flag)(result (make-array 0 :fill-pointer t :adjustable t))
 	 (when-id (lambda (new-id)
 		    (if (eql nil id)
 			(setf id new-id)
-			(error (format nil "dumplicated id:~a~%" (po2-index po))))))
+			(error (format nil "dumplicated id:~a~%" (po2-index po2))))))
 	 (when-str (lambda (new-str)
 		     (if (and (not (eql nil id)) (eql nil str))
 			 (setf str new-str)
-			 (error (format nil "error str:~a~%" (po2-index po))))))
+			 (error (format nil "error str:~a~%" (po2-index po2))))))
 	 (when-ctxt (lambda (new-ctxt)
 		      (if (eql nil ctxt)
 			  (setf ctxt new-ctxt)
-			  (error (format nil "dumplicated ctxt:~a~%" (po2-index po))))))
+			  (error (format nil "dumplicated ctxt:~a~%" (po2-index po2))))))
 	 (when-flag (lambda (new-flag)
 		      (if (eql nil flag)
 			  (setf flag new-flag)
-			  (error (format nil "dumplicated flag:~a~%" (po2-index po))))))
+			  (error (format nil "dumplicated flag:~a~%" (po2-index po2))))))
 	 (when-comment (lambda (string)
 			 string
 			 (cond ((and id str)
@@ -259,7 +245,7 @@
 				(setf flag nil)))))
 	 (when-blank-or-eof (lambda (string)
 			      string
-			      (mydebug t "blank:~a " (po2-index po))
+			      (mydebug t "blank:~a " (po2-index po2))
 			      (cond ((and id str)
 				     (vector-push-extend (list id str ctxt flag) result)
 				     (setf id nil str nil ctxt nil flag nil)))))
@@ -273,20 +259,20 @@
 		  (t nil))))
 	 (determined-when
 	  (lambda (string)
-	    (cond ((funcall s0 "msgid " string when-id (lambda ()(po2-read-whole-item-for-loop po)))(mydebug t "id:~a~%" (po2-index po)))
-		  ((funcall s0 "msgstr " string when-str (lambda ()(po2-read-whole-item-for-loop po)))(mydebug t "str:~a~%" (po2-index po)))
-		  ((funcall s0 "msgstr[0]" string when-str (lambda ()(po2-read-whole-item-for-loop po)))(mydebug t "str:~a~%" (po2-index po)))
-		  ((funcall s0 "msgctxt" string when-ctxt (lambda ()(po2-read-whole-item-for-loop po)))(mydebug t "ctxt:~a~%" (po2-index po)))
-		  ((funcall s0 "#," string when-flag)(mydebug t "#,:~a~%" (po2-index po)))
-		  ((eql nil string) (funcall s0 "" string when-blank-or-eof)(mydebug t "nil:~a~%" (po2-index po)))
-		  ((funcall s0 "#" string when-comment)(mydebug t "comment:~a~%" (po2-index po)))
-		  ((funcall s0 "" string when-blank-or-eof)(mydebug t "empty:~a~%" (po2-index po)))
+	    (cond ((funcall s0 "msgid " string when-id (lambda ()(po2-read-whole-item-for-loop po2)))(mydebug t "id:~a~%" (po2-index po2)))
+		  ((funcall s0 "msgstr " string when-str (lambda ()(po2-read-whole-item-for-loop po2)))(mydebug t "str:~a~%" (po2-index po2)))
+		  ((funcall s0 "msgstr[0]" string when-str (lambda ()(po2-read-whole-item-for-loop po2)))(mydebug t "str:~a~%" (po2-index po2)))
+		  ((funcall s0 "msgctxt" string when-ctxt (lambda ()(po2-read-whole-item-for-loop po2)))(mydebug t "ctxt:~a~%" (po2-index po2)))
+		  ((funcall s0 "#," string when-flag)(mydebug t "#,:~a~%" (po2-index po2)))
+		  ((eql nil string) (funcall s0 "" string when-blank-or-eof)(mydebug t "nil:~a~%" (po2-index po2)))
+		  ((funcall s0 "#" string when-comment)(mydebug t "comment:~a~%" (po2-index po2)))
+		  ((funcall s0 "" string when-blank-or-eof)(mydebug t "empty:~a~%" (po2-index po2)))
 		  (t (error (format nil "unexpect:~a~%" string)))))))
-    (po2-index-save po)
-    (po2-reset-index po)
+    (po2-index-save po2)
+    (po2-reset-index po2)
     (do ()
-	((po2-eof-p po) (funcall determined-when (po2-read-line po))result)
-      (funcall determined-when (po2-read-line po)))))
+	((po2-eof-p po2) (funcall determined-when (po2-read-line po2))result)
+      (funcall determined-when (po2-read-line po2)))))
 
 (let ((po)(index)(total))
   (defun po-clear()
@@ -583,6 +569,133 @@
 			      (char s2 i)))
      return (subseq s1 0 i)))
 
+(defun split-list (list n)
+  (loop
+     with l = (loop repeat n collect nil)
+     for i in list
+     for j from 0
+     do (push i (nth (mod j n) l))
+     finally (return l)))
+
+(defun if-table-exists-rename (db-filepath table-name)
+  (let ((number-of-tables))
+    (if (= 1 (parse-integer (com-with-sqlite3
+			     db-filepath
+			     (format nil "select count(name) from sqlite_master where name == '~a';" table-name))))
+	(progn
+	  (setf number-of-tables
+		(parse-integer
+		 (com-with-sqlite3
+		  db-filepath
+		  (format nil "select count(name) from sqlite_master where name like '~a%';" table-name))))
+	  ;; $dbh->do("alter table '${t1}_$j1' rename to '${t1}_$j2'");
+	  (format nil "alter table '~a' rename to '~:*~a_~a';" table-name (1- number-of-tables)))
+	nil)))
+
+(defun po2-file2sql (po-files output-file headinfo-table-name po-table-name)
+  (format t "~a~%" output-file)
+  (with-open-file (out output-file :direction :output :if-exists :supersede :if-does-not-exist :create)
+    ;; (format out "begin transaction;~%")
+    (loop
+       for po-file in (probe-list po-files)
+       for po-file-name = (namestring po-file)
+       for po2 = (make-po2)
+       do (po2-read po2 po-file)
+       do (format out "~a~%" (headinfo-sql headinfo-table-name po-file-name (po2-get-headinfo po2)))
+       do (loop for i in (po-sql po-table-name po-file-name (po2-parse po2))
+	     do (format out "~a~%" i)))
+    ;; (format out "commit;~%")
+    ))
+
+(defun po22sql (po-files output-file headinfo-table-name po-table-name &key pre-sql suf-sql db-filepath (thread t) (num-of-threads 2))
+  (if
+   thread
+   (let ((pre-file (concatenate-strings output-file "-pre"))
+	 (suf-file (concatenate-strings output-file "-suf"))
+	 threads)
+     (loop
+	for i in (split-list (probe-list po-files) num-of-threads)
+	for j from 0
+	for output = (format nil "~a-~a" output-file j)
+	do (format t "[~a~%" output)
+	do (let ((i i) (output output))
+	     (push
+	      #+sbcl
+	      (sb-thread:make-thread (lambda () (po2-file2sql i output headinfo-table-name po-table-name)))
+	      threads)))
+     
+     (with-open-file (out pre-file :direction :output :if-exists :supersede :if-does-not-exist :create)
+       (format out "begin transaction;~%")
+
+       ;; pre sql output
+       (if pre-sql
+	   (loop for i in (probe-list pre-sql)
+	      do (format out "~a~%" i)))
+       (loop for i in `(,po-table-name ,headinfo-table-name)
+	  for sql = (if-table-exists-rename db-filepath i)
+	  if sql
+	  do (format out "~a~%" sql))
+
+       ;; $dbh->do("create table '$t1' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,pof text)");
+       ;; $dbh->do("create table '$t2' (pof text,lname text,lmail text,tname text,tmail text,charset text,pforms text)");
+       (format out "create table '~a' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,pof text);~%" po-table-name)
+       (format out "create table '~a' (pof text,lname text,lmail text,tname text,tmail text,charset text,pforms text);~%" headinfo-table-name)
+       ;; (format out "commit;~%")
+       )
+     
+     (with-open-file (out suf-file :direction :output :if-exists :supersede :if-does-not-exist :create)
+       ;; (format out "begin transaction;~%")
+       (if db-filepath
+	   (let ((index-of-headinfo (concatenate-strings "i_" headinfo-table-name))
+		 (index-of-po (concatenate-strings "i_" po-table-name))
+		 (number-of-headinfo
+		  (parse-integer
+		   (com-with-sqlite3
+		    db-filepath
+		    (format nil "select count(name) from sqlite_master where name like '~a%';" headinfo-table-name))))
+		 (number-of-po
+		  (parse-integer
+		   (com-with-sqlite3
+		    db-filepath
+		    (format nil "select count(name) from sqlite_master where name like '~a%';" po-table-name)))))
+	     ;; $dbh->do("create index '$i1' on '$t1' (id,msgid,msgstr,msgctxt,fuzzy,flag,pof)");
+	     ;; $dbh->do("create index '$i2' on '$t2' (pof,lname,lmail,tname,tmail,charset,pforms)");
+	     (format out "create index '~a_~a' on '~a' (id,msgid,msgstr,msgctxt,fuzzy,flag,pof);~%" index-of-po number-of-po po-table-name)
+	     (format out "create index '~a_~a' on '~a' (pof,lname,lmail,tname,tmail,charset,pforms);~%" index-of-headinfo number-of-headinfo headinfo-table-name))
+	   (let ((index-of-headinfo (concatenate-strings "i_" headinfo-table-name))
+		 (index-of-po (concatenate-strings "i_" po-table-name)))
+	     (format out "create index '~a' on '~a' (id,msgid,msgstr,msgctxt,fuzzy,flag,pof);~%" index-of-po po-table-name)
+	     (format out "create index '~a' on '~a' (pof,lname,lmail,tname,tmail,charset,pforms);~%" index-of-headinfo  headinfo-table-name)))
+       
+       (loop for i in (probe-list suf-sql)
+	  do (format out "~a~%" i))
+       
+       (format out "commit;~%")
+       )
+     #+sbcl
+     (loop for i in threads
+	if (sb-thread:thread-alive-p i)
+	do (sb-thread:join-thread i)))))
+
+(defun loadavg ()
+  (with-open-file (in "/proc/loadavg")
+    (- (char-code
+	(read-char in))
+       (char-code #\0))))
+
+(defun get-cpu-amounts ()
+  (with-open-file (in "/proc/cpuinfo")
+    (loop
+       for i = (read-line in nil nil)
+       while i
+       if (eq 0 (search "processor" i))
+       counting i)))
+
+(defun best-num-of-threads ()
+  (1+ 
+   (- (get-cpu-amounts)
+      (min (loadavg) (get-cpu-amounts)))))
+
 (defun test ()
   (let* ((po-table "t_")
 	 (headinfo-table "h_")
@@ -649,14 +762,37 @@
 	 "@"))
     (if po-files
 	(let ((headinfo-table-name (concatenate-strings *default-headinfo-prefix* table-suffix))
-	      (po-table-name (concatenate-strings *default-table-prefix* table-suffix)))
-	  (po2sql po-files output-file headinfo-table-name po-table-name :db-filepath db-file-path)
-	  (com-with-sqlite3 db-file-path (concatenate-strings ".read " output-file))
-	  (if (and
-	       #+sbcl
-	       (not (sb-ext:posix-getenv "DEBUG"))
-	       (probe-file output-file))
-	      (delete-file output-file))))))
+	      (po-table-name (concatenate-strings *default-table-prefix* table-suffix))
+	      (threads (best-num-of-threads)))
+	  (format t "~a~%" (sb-ext:posix-getenv "UNI"))
+	  (if #+sbcl (not (sb-ext:posix-getenv "UNI"))
+	      (progn
+		(po22sql po-files output-file headinfo-table-name po-table-name :db-filepath db-file-path :num-of-threads threads)
+		#+sbcl
+		(if (probe-file output-file)
+		    (delete-file output-file))
+		#+sbcl
+		(sb-ext:run-program "cat" (loop
+					     with a = (list (concatenate-strings output-file "-suf"))
+					     for i from 0 to (1- threads)
+					     do (push (concatenate-strings  output-file "-" (write-to-string i)) a)
+					     finally (progn (push (concatenate-strings output-file "-pre") a)
+							    (return a))) :search t :output output-file)
+		(com-with-sqlite3 db-file-path (concatenate-strings ".read " output-file))
+		;; (com-with-sqlite3 db-file-path (concatenate-strings ".read " output-file "-pre"))
+		;; (loop for i from 0 to (1- threads)
+		;;    do (com-with-sqlite3 db-file-path (concatenate-strings ".read " output-file "-" (write-to-string i))))
+		;; (com-with-sqlite3 db-file-path (concatenate-strings ".read " output-file "-suf"))
+		)
+	      (progn
+		(po2sql po-files output-file headinfo-table-name po-table-name :db-filepath db-file-path)
+		(com-with-sqlite3 db-file-path (concatenate-strings ".read " output-file))))
+	  ;; (if (and
+	  ;;      #+sbcl
+	  ;;      (not (sb-ext:posix-getenv "DEBUG"))
+	  ;;      (probe-file output-file))
+	  ;;     (delete-file output-file))
+	  ))))
 (defun main ()
   (defun hot-update ()
     (let ((first (cadr
