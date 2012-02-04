@@ -69,6 +69,27 @@
     ((atom (car l)) (cons (car l) (flatlist (cdr l))))
     ((append (flatlist (car l)) (flatlist (cdr l))))))
 
+(defun escape (string)
+  (let ((l (coerce string 'list)))
+    (coerce
+     (loop for i in l
+	if (eql #\' i)
+	collect #\' and collect #\'
+	else collect i) 'string)))
+
+(defun escape-args (&rest args)
+  (loop for i in args collect (escape i)))
+
+(defmacro escape-and-setf (&rest args)
+  `(progn ,@(loop for i in args collect `(setf ,i (escape ,i)))))
+
+(defun get-quoted-text(string)
+  (let* ((first (search "\"" string))
+	 (last (search "\"" string :from-end t)))
+    (if (and first last (not (= first last)))
+	(subseq string (1+ first) last)
+	"")))
+
 (defun read-file-to-vector(filepath)
   (let ((content (make-array 0 :fill-pointer t :adjustable t)))
     (with-open-file (in filepath)
@@ -84,7 +105,188 @@
 	      collect i into s
 	      count (search "msgid" i) into id
 	      finally (return (list s id))))))
+(defstruct po-file-parse
+  (po nil)
+  (index 0)
+  (total 0)
+  pre-index)
 
+(defclass po ()
+  ((po-file-parse :accessor po-file-parse :initform (make-po-file-parse))))
+
+(defun po2-clear (po)
+  (let ((po-file-parse (po-file-parse po)))
+    (setf (po-file-parse-po po-file-parse) nil
+	  (po-file-parse-index po-file-parse) 0
+	  (po-file-parse-total po-file-parse) 0))
+  po)
+
+(defun po2-reset-index (po)
+  (setf (po-file-parse-index (po-file-parse po)) 0)
+  po)
+
+(defun po2-read (po filepath)
+  (let ((po-file-parse (po-file-parse po)))
+    (setf (po-file-parse-po po-file-parse) (read-file-to-vector filepath)
+	  (po-file-parse-index po-file-parse) 0
+	  (po-file-parse-total po-file-parse) (length (po-file-parse-po po-file-parse))))
+  po)
+
+(defun po2-read-line (po)
+  (let* ((po-file-parse (po-file-parse po))
+	 (index (po-file-parse-index po-file-parse))
+	 (total (po-file-parse-total po-file-parse))
+	 (po (po-file-parse-po po-file-parse)))
+    (cond ((< index total)
+	   (aref po (1- (incf (po-file-parse-index po-file-parse)))))
+	  (t nil))))
+
+(defun po2-goto-previous-line (po)
+  (let ((po-file-parse (po-file-parse po)))
+    (if (> (po-file-parse-index po-file-parse) 0)
+	(decf (po-file-parse-index po-file-parse))))
+  po)
+
+(defun po2-eof-p (po)
+  (let* ((po-file-parse (po-file-parse po))
+	 (index (po-file-parse-index po-file-parse))
+	 (total (po-file-parse-total po-file-parse)))
+    (eq index total)))
+
+(defun po2-index (po)
+  (po-file-parse-index (po-file-parse po)))
+
+(defun po2-total (po)
+  (po-file-parse-total (po-file-parse po)))
+
+(defun po2-set-index (po i)
+  (let* ((po-file-parse (po-file-parse po))
+	 (total (po-file-parse-total po-file-parse))
+	 index)
+    (cond ((>= i total)
+	   (setf index (1- total)))
+	  ((minusp i)
+	   (setf index 0))
+	  (t
+	   (setf index i)))
+    (setf (po-file-parse-index po-file-parse) index))
+  po)
+
+(defun po2-index-save (po)
+  (let ((po-file-parse (po-file-parse po)))
+    (setf (po-file-parse-pre-index po-file-parse)
+	  (po-file-parse-index po-file-parse)))
+  po)
+
+(defun po2-index-restore (po)
+  (let ((po-file-parse (po-file-parse po)))
+    (and (po-file-parse-pre-index po-file-parse)
+	 (po2-set-index po (po-file-parse-pre-index po-file-parse))
+	 (setf (po-file-parse-pre-index po-file-parse) nil)))
+  po)
+
+
+(defun po2-read-whole-item (po)
+  (let ((first (get-quoted-text (po2-read-line po))))
+    (apply #'concatenate-strings
+	   first
+	   (loop for i = (po2-read-line po)
+	      while i
+	      if (eql 0 (search "\"" i))
+	      collect (get-quoted-text i) into s
+	      else
+	      do (po2-goto-previous-line po) and
+	      return s))))
+
+(defun get-headinfo-item (re string)
+  (cadr
+   (multiple-value-list
+    (cl-ppcre:scan-to-strings
+     re
+     string))))
+
+(defun po2-get-headinfo(po)
+  (po2-index-save po)
+  (po2-reset-index po)
+  (values
+   (mapcar  #'get-headinfo-item
+	   ;; ("\"Last-Translator: YunQiang Su <wzssyqa@gmail.com>\\n\""
+	   ;;  "\"Language-Team: Chinese (simplified) <i18n-zh@googlegroups.com>\\n\""
+	   ;;  "\"Content-Type: text/plain; charset=UTF-8\\n\""
+	   ;;  "\"Plural-Forms: nplurals=1; plural=0;\\n\"")
+	   '("^\"Last-Translator: *([^<]+[^ <]) *<([^>]+)>"
+	     "^\"Language-Team: *([^<]+[^ <]) *<([^>]+)>"
+	     "^\"Content-Type: text/plain; charset=([^ ]+) *\\\\n\""
+	     "^\"Plural-Forms: *(.+[^ ]) *\\\\n\"")
+	   (flatlist
+	    (loop for i = (po2-read-line po)
+	       while i
+	       if (eql 0 (search "\"Last-Translator:" i ))collect i into last
+	       if (eql 0 (search "\"Language-Team:" i ))collect i into lang
+	       if (eql 0 (search "\"Content-Type: text\/plain; charset=" i)) collect i into char
+	       if (eql 0 (search "\"Plural-Forms:" i)) collect i into plural
+	       until (and last lang char plural) finally (return (list last lang char plural)))))
+   (po2-index-restore po)))
+
+(defun po2-read-whole-item-for-loop(po)
+  (po2-goto-previous-line po)
+  (po2-read-whole-item po))
+
+(defun  po2-parse(po)
+  (let* ((id)(str)(ctxt)(flag)(result (make-array 0 :fill-pointer t :adjustable t))
+	 (when-id (lambda (new-id)
+		    (if (eql nil id)
+			(setf id new-id)
+			(error (format nil "dumplicated id:~a~%" (po2-index po))))))
+	 (when-str (lambda (new-str)
+		     (if (and (not (eql nil id)) (eql nil str))
+			 (setf str new-str)
+			 (error (format nil "error str:~a~%" (po2-index po))))))
+	 (when-ctxt (lambda (new-ctxt)
+		      (if (eql nil ctxt)
+			  (setf ctxt new-ctxt)
+			  (error (format nil "dumplicated ctxt:~a~%" (po2-index po))))))
+	 (when-flag (lambda (new-flag)
+		      (if (eql nil flag)
+			  (setf flag new-flag)
+			  (error (format nil "dumplicated flag:~a~%" (po2-index po))))))
+	 (when-comment (lambda (string)
+			 string
+			 (cond ((and id str)
+				(vector-push-extend (list id str ctxt flag) result)
+				(setf id nil str nil ctxt nil flag nil))
+			       ((not (eql nil flag))
+				(setf flag nil)))))
+	 (when-blank-or-eof (lambda (string)
+			      string
+			      (mydebug t "blank:~a " (po2-index po))
+			      (cond ((and id str)
+				     (vector-push-extend (list id str ctxt flag) result)
+				     (setf id nil str nil ctxt nil flag nil)))))
+	 (s0
+	  (lambda (s1 s2 fn &optional (ext-fun nil))
+	    (cond ((eql 0 (search s1 s2))
+		   (if (eql nil  ext-fun)
+		       (funcall fn s2)
+		       (funcall fn (funcall ext-fun)))
+		   t)
+		  (t nil))))
+	 (determined-when
+	  (lambda (string)
+	    (cond ((funcall s0 "msgid " string when-id (lambda ()(po2-read-whole-item-for-loop po)))(mydebug t "id:~a~%" (po2-index po)))
+		  ((funcall s0 "msgstr " string when-str (lambda ()(po2-read-whole-item-for-loop po)))(mydebug t "str:~a~%" (po2-index po)))
+		  ((funcall s0 "msgstr[0]" string when-str (lambda ()(po2-read-whole-item-for-loop po)))(mydebug t "str:~a~%" (po2-index po)))
+		  ((funcall s0 "msgctxt" string when-ctxt (lambda ()(po2-read-whole-item-for-loop po)))(mydebug t "ctxt:~a~%" (po2-index po)))
+		  ((funcall s0 "#," string when-flag)(mydebug t "#,:~a~%" (po2-index po)))
+		  ((eql nil string) (funcall s0 "" string when-blank-or-eof)(mydebug t "nil:~a~%" (po2-index po)))
+		  ((funcall s0 "#" string when-comment)(mydebug t "comment:~a~%" (po2-index po)))
+		  ((funcall s0 "" string when-blank-or-eof)(mydebug t "empty:~a~%" (po2-index po)))
+		  (t (error (format nil "unexpect:~a~%" string)))))))
+    (po2-index-save po)
+    (po2-reset-index po)
+    (do ()
+	((po2-eof-p po) (funcall determined-when (po2-read-line po))result)
+      (funcall determined-when (po2-read-line po)))))
 
 (let ((po)(index)(total))
   (defun po-clear()
@@ -133,26 +335,6 @@
     (and pre (po-set-index pre))))
 
 
-(defun escape (string)
-  (let ((l (coerce string 'list)))
-    (coerce
-     (loop for i in l
-	if (eql #\' i)
-	collect #\' and collect #\'
-	else collect i) 'string)))
-
-(defun escape-args (&rest args)
-  (loop for i in args collect (escape i)))
-
-(defmacro escape-and-setf (&rest args)
-  `(progn ,@(loop for i in args collect `(setf ,i (escape ,i)))))
-
-(defun get-quoted-text(string)
-  (let* ((first (search "\"" string))
-	 (last (search "\"" string :from-end t)))
-    (if (and first last (not (= first last)))
-	(subseq string (1+ first) last)
-	"")))
 
 (defun po-read-whole-item()
   (let ((first (get-quoted-text (po-read-line))))
