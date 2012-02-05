@@ -593,7 +593,6 @@
 	nil)))
 
 (defun po2-file2sql (po-files output-file headinfo-table-name po-table-name)
-  (format t "~a~%" output-file)
   (with-open-file (out output-file :direction :output :if-exists :supersede :if-does-not-exist :create)
     ;; (format out "begin transaction;~%")
     (loop
@@ -617,7 +616,6 @@
 	for i in (split-list (probe-list po-files) num-of-threads)
 	for j from 0
 	for output = (format nil "~a-~a" output-file j)
-	do (format t "[~a~%" output)
 	do (let ((i i) (output output))
 	     (push
 	      #+sbcl
@@ -670,8 +668,7 @@
        (loop for i in (probe-list suf-sql)
 	  do (format out "~a~%" i))
        
-       (format out "commit;~%")
-       )
+       (format out "commit;~%"))
      #+sbcl
      (loop for i in threads
 	if (sb-thread:thread-alive-p i)
@@ -764,7 +761,6 @@
 	(let ((headinfo-table-name (concatenate-strings *default-headinfo-prefix* table-suffix))
 	      (po-table-name (concatenate-strings *default-table-prefix* table-suffix))
 	      (threads (best-num-of-threads)))
-	  (format t "~a~%" (sb-ext:posix-getenv "UNI"))
 	  (if #+sbcl (not (sb-ext:posix-getenv "UNI"))
 	      (progn
 		(po22sql po-files output-file headinfo-table-name po-table-name :db-filepath db-file-path :num-of-threads threads)
@@ -779,6 +775,13 @@
 					     finally (progn (push (concatenate-strings output-file "-pre") a)
 							    (return a))) :search t :output output-file)
 		(com-with-sqlite3 db-file-path (concatenate-strings ".read " output-file))
+		(loop for i in (loop
+					     with a = (list (concatenate-strings output-file "-suf"))
+					     for i from 0 to (1- threads)
+					     do (push (concatenate-strings  output-file "-" (write-to-string i)) a)
+					     finally (progn (push (concatenate-strings output-file "-pre") a)
+							    (return a)))
+		   do (delete-file i))
 		;; (com-with-sqlite3 db-file-path (concatenate-strings ".read " output-file "-pre"))
 		;; (loop for i from 0 to (1- threads)
 		;;    do (com-with-sqlite3 db-file-path (concatenate-strings ".read " output-file "-" (write-to-string i))))
@@ -787,11 +790,11 @@
 	      (progn
 		(po2sql po-files output-file headinfo-table-name po-table-name :db-filepath db-file-path)
 		(com-with-sqlite3 db-file-path (concatenate-strings ".read " output-file))))
-	  ;; (if (and
-	  ;;      #+sbcl
-	  ;;      (not (sb-ext:posix-getenv "DEBUG"))
-	  ;;      (probe-file output-file))
-	  ;;     (delete-file output-file))
+	  (if (and
+	       #+sbcl
+	       (not (sb-ext:posix-getenv "DEBUG"))
+	       (probe-file output-file))
+	      (delete-file output-file))
 	  ))))
 (defun main ()
   (defun hot-update ()
