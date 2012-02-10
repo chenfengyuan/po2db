@@ -51,7 +51,6 @@ if(defined $path_f){
 $table_suffix= $path_pre if $table_suffix eq 'default';
 $table_suffix=~s/\/$//;
 $table_suffix=~s/.*\///;
-$table_suffix=~s/\//_/g;
 $table_suffix=~s/'//g;
 
 my $t1="t_$table_suffix";#translations
