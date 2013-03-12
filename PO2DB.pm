@@ -102,22 +102,22 @@ sub headerinfo{
     my $fn=shift;
     open my $in,'<',$fn;
     my($trans,$trans_e,$team,$team_e,$charset,$pf);
-    while(<$in>){
+    while (<$in>) {
 	# "Last-Translator: Yinghua Wang <wantinghard@gmail.com>\n"
-	if(/^"Last-Translator: *([^<]+[^ <]) *<([^>]+)>/){
+	if (/^"Last-Translator: *([^<]+[^ <]) *<([^>]+)>/) {
 	    $trans=$1;
 	    $trans_e=$2;
 	}
 	# "Language-Team: Chinese (simplified) <i18n-zh@googlegroups.com>\n"
-	if(/^"Language-Team: *([^<]+[^ <]) *<([^>]+)>/){
+	if (/^"Language-Team: *([^<]+[^ <]) *<([^>]+)>/) {
 	    $team=$1;
 	    $team_e=$2;
 	}
-	if(/^"Content-Type: text\/plain; charset=([^ ]+) *\\n"/){
-	$charset=$1;
-    }
+	if (/^"Content-Type: text\/plain; charset=([^ ]+) *\\n"/) {
+	    $charset=$1;
+	}
 	# "Plural-Forms: nplurals=1; plural=0;\n"
-	if(/^"Plural-Forms: *(.+[^ ]) *\\n"/){
+	if (/^"Plural-Forms: *(.+[^ ]) *\\n"/) {
 	    $pf=$1;
 	}
     }
