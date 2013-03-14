@@ -5,20 +5,6 @@ local push = function(arr,item)
    arr[#arr+1]=item
 end
 
-local function values (t)
-   local i = 0
-   return function ()  i = i + 1; return t[i]  end
-end
-
-local function ivalues (t)
-   local i = 0
-   return function ()
-      i = i + 1;
-      if t[i] then
-	 return i,t[i]
-      end
-	  end
-end
 local function get_file_as_t (file)
    local content = {}
    local i = 0;
@@ -34,7 +20,7 @@ local get_items = function (content)
    local match=string.match
    local format=string.format
    local key,item=nil,{}
-   for i,line in ivalues(content) do
+   for i,line in ipairs(content) do
       if line:find([[^"]]) then
 	 my_assert(key,format("tailing string in wrong position,line number: %d\nline:%s",i,line))
 	 if key ~= "m-other" then
@@ -83,7 +69,7 @@ local function headerinfo (content)
    local trans,trans_e,team,team_e,charset,pf
    local match = string.match
    local find = string.find
-   for line in values(content) do
+   for _,line in ipairs(content) do
       -- "Last-Translator: Yinghua Wang <wantinghard@gmail.com>\n"
       if(find(line,[[^"Last%-Translator]])) then
       	 trans,trans_e=match(line,[[^"Last%-Translator: *([^<]+[^ <]) *<([^>]+)>]])
@@ -124,7 +110,7 @@ local function main ()
       tm1=tm1+clock()
       file=con:escape(file)
       tm2=tm2-clock()
-      for i,item in ivalues(items) do
+      for i,item in ipairs(items) do
 	 res = assert(con:execute(format("insert into 'tab' values(%d,'%s','%s','%s',1,'aou','%s')",
 					 i,e(item,'msgid'),e(item,'msgstr'),e(item,'msgctxt'),file)),format("%s,line number:%d",item["msgstr"],i))
       end
