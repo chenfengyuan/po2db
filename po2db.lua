@@ -87,7 +87,7 @@ local function headerinfo (content)
 end
 
 local function main ()
-   assert(#arg>=1,"need one argument\n")
+   assert(#arg>=1,"need arguments\n")
    local format=string.format
    local luasql=require("luasql.sqlite3")
    local clock=os.clock
