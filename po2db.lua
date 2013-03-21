@@ -86,14 +86,55 @@ local function headerinfo (content)
    return trans,trans_e,team,team_e,charset,pf
 end
 
+local function parse_opt(arg)
+   require "alt_getopt"
+   local long_opts = {
+      verbose = "v",
+      help    = "h",
+      db_file_path = "d",
+      table_suffix = "t",
+   }
+
+   local optarg,optind = alt_getopt.get_opts (arg,"vhd:t:", long_opts)
+   
+   local verbose,help,db_file_path,table_suffix=optarg["v"],optarg["h"],optarg["d"] or "main.sqlite",optarg["t"] or "default"
+   local poes={}
+   for i = optind,#arg do
+      push(poes,arg[i])
+   end
+   print (verbose,help,db_file_path,table_suffix,poes)
+end
+
+local function setting_table_and_index(con,trans_table,header_table)
+   local cur
+   local format = string.format
+   for _,table in ipairs({trans_table,header_table}) do
+      table = con:escape(table)
+      cur = assert(con:execute(format("select count(name) from sqlite_master where name == '%s';",table)))
+      local table_exists_p = (cur:fetch())
+      cur:close()
+      if(table_exists_p) then
+	 local cur = assert(con:execute(format("select count(name) from sqlite_master where name like '%s%%';",table)))
+	 local number_of_tables = cur:fetch()
+	 cur:close()
+	 assert(con:execute(format("alter table '%s' rename to '%s_%d';'",table,table,number_of_tables-1)))
+      end
+   end
+   assert(con:execute(format("create table '%s' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,pof text);\n",con:escape(trans_table))))
+   assert(con:execute(format("create table '%s' (pof text,lname text,lmail text,tname text,tmail text,charset text,pforms text);\n",con:escape(header_table))))
+end
+
 local function main ()
-   assert(#arg>=1,"need arguments\n")
+   local verbose,help,db_file_path,table_suffix,poes = parse_opt(arg)
    local format=string.format
    local luasql=require("luasql.sqlite3")
    local clock=os.clock
-   local tm1,tm2=0,0
+   local tm_parsing,tm_db=0,0
    local env = assert (luasql.sqlite3())
    local con = assert (env:connect("test.sqlite"))
+   local t
+   setting_table_and_index(con,"t_default","h_default")
+   os.exit()
    local e = function (t,i)
       if t[i] then
 	 return con:escape(t[i])
@@ -101,26 +142,28 @@ local function main ()
 	 return ""
       end
    end
-   local res = assert (con:execute[[BEGIN TRANSACTION]])
+   local res
+   res = assert (con:execute[[BEGIN TRANSACTION]])
    res = assert (con:execute[[create table 'tab' (id integer,msgid text,msgstr text,msgctxt text,fuzzy bool,flag text,pof text)]])
    for _,file in ipairs(arg) do
-      tm1=tm1-clock()
+      tm_parsing=tm_parsing-clock()
       local content=get_file_as_t(file)
       local items=get_items(content)
-      tm1=tm1+clock()
+      tm_parsing=tm_parsing+clock()
       file=con:escape(file)
-      tm2=tm2-clock()
+      tm_db=tm_db-clock()
       for i,item in ipairs(items) do
 	 res = assert(con:execute(format("insert into 'tab' values(%d,'%s','%s','%s',1,'aou','%s')",
 					 i,e(item,'msgid'),e(item,'msgstr'),e(item,'msgctxt'),file)),format("%s,line number:%d",item["msgstr"],i))
       end
-      tm2=tm2+clock()
+      tm_db=tm_db+clock()
    end
-   tm2=tm2-clock()
+   tm_db=tm_db-clock()
    res = assert(con:execute("create index 'idx' on 'tab' (id,msgid,msgstr,msgctxt,fuzzy,flag,pof)"))
    res = assert (con:commit())
-   tm2=tm2+clock()
-   print(tm1,tm2)
+   tm_db=tm_db+clock()
+   print(tm_parsing,tm_db)
 end
 
+-- parse_opt(arg)
 main()
